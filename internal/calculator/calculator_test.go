@@ -9,29 +9,28 @@ import (
 
 func TestStatistics_GetAverageCostPerSession(t *testing.T) {
 	tests := []struct {
-		name     string
 		analysis *models.CostAnalysis
+		name     string
 		want     float64
 	}{
 		{
-			name: "empty sessions",
 			analysis: &models.CostAnalysis{
 				Sessions: make(map[string]*models.SessionStats),
 			},
+			name: "empty sessions",
 			want: 0,
 		},
 		{
-			name: "single session",
 			analysis: &models.CostAnalysis{
 				TotalCost: 10.0,
 				Sessions: map[string]*models.SessionStats{
 					"session1": {Cost: 10.0},
 				},
 			},
+			name: "single session",
 			want: 10.0,
 		},
 		{
-			name: "multiple sessions",
 			analysis: &models.CostAnalysis{
 				TotalCost: 30.0,
 				Sessions: map[string]*models.SessionStats{
@@ -40,6 +39,7 @@ func TestStatistics_GetAverageCostPerSession(t *testing.T) {
 					"session3": {Cost: 5.0},
 				},
 			},
+			name: "multiple sessions",
 			want: 10.0,
 		},
 	}
@@ -56,32 +56,32 @@ func TestStatistics_GetAverageCostPerSession(t *testing.T) {
 
 func TestStatistics_GetCacheHitRate(t *testing.T) {
 	tests := []struct {
-		name     string
 		analysis *models.CostAnalysis
+		name     string
 		want     float64
 	}{
 		{
-			name: "no input tokens",
 			analysis: &models.CostAnalysis{
 				TotalInputTokens: 0,
 				TotalCacheRead:   0,
 			},
+			name: "no input tokens",
 			want: 0,
 		},
 		{
-			name: "50% cache hit rate",
 			analysis: &models.CostAnalysis{
 				TotalInputTokens: 1000,
 				TotalCacheRead:   500,
 			},
+			name: "50% cache hit rate",
 			want: 50.0,
 		},
 		{
-			name: "100% cache hit rate",
 			analysis: &models.CostAnalysis{
 				TotalInputTokens: 1000,
 				TotalCacheRead:   1000,
 			},
+			name: "100% cache hit rate",
 			want: 100.0,
 		},
 	}

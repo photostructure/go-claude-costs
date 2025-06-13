@@ -15,9 +15,9 @@ import (
 
 // Parser handles parsing JSONL files and extracting cost data
 type Parser struct {
-	daysToAnalyze    int
-	claudeDir        string
 	projectNameCache map[string]string // Cache for project name extraction
+	claudeDir        string
+	daysToAnalyze    int
 }
 
 // New creates a new Parser instance
