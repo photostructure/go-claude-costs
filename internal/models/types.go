@@ -77,14 +77,14 @@ var DefaultPricing = PricingTier{
 
 // Entry represents a single entry in the JSONL file
 type Entry struct {
-	Message         *MessageContent `json:"message,omitempty"`
-	ToolUseResult   *ToolUseResult  `json:"toolUseResult,omitempty"`
+	ParsedTimestamp time.Time       `json:"-"` // Computed field, not from JSON
 	UUID            string          `json:"uuid"`
 	ParentUUID      string          `json:"parentUuid"`
 	Type            string          `json:"type"`
 	Timestamp       string          `json:"timestamp"`
 	SessionID       string          `json:"sessionId"`
-	ParsedTimestamp time.Time       `json:"-"` // Computed field, not from JSON
+	Message         *MessageContent `json:"message,omitempty"`
+	ToolUseResult   *ToolUseResult  `json:"toolUseResult,omitempty"`
 	CostUSD         float64         `json:"costUSD,omitempty"`
 }
 
@@ -118,9 +118,9 @@ type ToolContent struct {
 
 // SessionStats holds aggregated statistics for a session
 type SessionStats struct {
-	ResponseTimes    []time.Duration
 	StartTime        time.Time
 	EndTime          time.Time
+	ResponseTimes    []time.Duration
 	Cost             float64
 	InputTokens      int
 	OutputTokens     int
@@ -164,15 +164,15 @@ type ToolUseStats struct {
 
 // CostAnalysis holds the complete analysis results
 type CostAnalysis struct {
+	StartDate         time.Time
+	EndDate           time.Time
 	Sessions          map[string]*SessionStats
 	Projects          map[string]*ProjectStats
 	HourlyActivity    map[int]*HourlyActivity
 	DailyActivity     map[string]*DailyActivity
 	ModelUsage        map[string]int
-	ToolUse           *ToolUseStats
 	ResponseTimes     []time.Duration
-	StartDate         time.Time
-	EndDate           time.Time
+	ToolUse           *ToolUseStats
 	TotalCost         float64
 	CacheSavings      float64
 	TotalInputTokens  int
