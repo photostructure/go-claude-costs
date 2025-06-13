@@ -1,6 +1,6 @@
 # go-claude-costs
 
-A Go implementation of claude-costs - analyze your Claude Code usage costs and statistics by parsing local metadata files.
+A Go implementation of [claude-costs](https://github.com/photostructure/claude-costs) - analyze your Claude Code usage costs and statistics by parsing local metadata files.
 
 ## Features
 
