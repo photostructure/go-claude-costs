@@ -78,13 +78,13 @@ var DefaultPricing = PricingTier{
 // Entry represents a single entry in the JSONL file
 type Entry struct {
 	ParsedTimestamp time.Time       `json:"-"` // Computed field, not from JSON
+	Message         *MessageContent `json:"message,omitempty"`
+	ToolUseResult   *ToolUseResult  `json:"toolUseResult,omitempty"`
 	UUID            string          `json:"uuid"`
 	ParentUUID      string          `json:"parentUuid"`
 	Type            string          `json:"type"`
 	Timestamp       string          `json:"timestamp"`
 	SessionID       string          `json:"sessionId"`
-	Message         *MessageContent `json:"message,omitempty"`
-	ToolUseResult   *ToolUseResult  `json:"toolUseResult,omitempty"`
 	CostUSD         float64         `json:"costUSD,omitempty"`
 }
 
@@ -166,12 +166,12 @@ type ToolUseStats struct {
 type CostAnalysis struct {
 	StartDate         time.Time
 	EndDate           time.Time
+	ResponseTimes     []time.Duration
 	Sessions          map[string]*SessionStats
 	Projects          map[string]*ProjectStats
 	HourlyActivity    map[int]*HourlyActivity
 	DailyActivity     map[string]*DailyActivity
 	ModelUsage        map[string]int
-	ResponseTimes     []time.Duration
 	ToolUse           *ToolUseStats
 	TotalCost         float64
 	CacheSavings      float64
