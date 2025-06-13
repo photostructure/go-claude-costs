@@ -77,23 +77,23 @@ var DefaultPricing = PricingTier{
 
 // Entry represents a single entry in the JSONL file
 type Entry struct {
+	Message         *MessageContent `json:"message,omitempty"`
+	ToolUseResult   *ToolUseResult  `json:"toolUseResult,omitempty"`
 	UUID            string          `json:"uuid"`
 	ParentUUID      string          `json:"parentUuid"`
 	Type            string          `json:"type"`
 	Timestamp       string          `json:"timestamp"`
-	CostUSD         float64         `json:"costUSD,omitempty"`
 	SessionID       string          `json:"sessionId"`
-	Message         *MessageContent `json:"message,omitempty"`
-	ToolUseResult   *ToolUseResult  `json:"toolUseResult,omitempty"`
 	ParsedTimestamp time.Time       `json:"-"` // Computed field, not from JSON
+	CostUSD         float64         `json:"costUSD,omitempty"`
 }
 
 // MessageContent represents the message field in an entry
 type MessageContent struct {
-	Role    string      `json:"role"`
-	Model   string      `json:"model"`
 	Content interface{} `json:"content"` // Can be string or array
 	Usage   *Usage      `json:"usage,omitempty"`
+	Role    string      `json:"role"`
+	Model   string      `json:"model"`
 }
 
 // Usage represents token usage in new format
@@ -118,20 +118,23 @@ type ToolContent struct {
 
 // SessionStats holds aggregated statistics for a session
 type SessionStats struct {
+	ResponseTimes    []time.Duration
+	StartTime        time.Time
+	EndTime          time.Time
 	Cost             float64
 	InputTokens      int
 	OutputTokens     int
 	CacheReadTokens  int
 	CacheWriteTokens int
 	TotalTokens      int
-	StartTime        time.Time
-	EndTime          time.Time
 	MessageCount     int
-	ResponseTimes    []time.Duration
 }
 
 // ProjectStats holds aggregated statistics for a project
 type ProjectStats struct {
+	ActiveDays       map[string]bool
+	SessionIDs       map[string]bool
+	ResponseTimes    []time.Duration
 	Cost             float64
 	Sessions         int
 	InputTokens      int
@@ -139,9 +142,6 @@ type ProjectStats struct {
 	CacheReadTokens  int
 	CacheWriteTokens int
 	TotalTokens      int
-	ActiveDays       map[string]bool
-	SessionIDs       map[string]bool
-	ResponseTimes    []time.Duration
 }
 
 // HourlyActivity tracks activity by hour of day
@@ -164,12 +164,6 @@ type ToolUseStats struct {
 
 // CostAnalysis holds the complete analysis results
 type CostAnalysis struct {
-	TotalCost         float64
-	CacheSavings      float64
-	TotalInputTokens  int
-	TotalOutputTokens int
-	TotalCacheRead    int
-	TotalCacheWrite   int
 	Sessions          map[string]*SessionStats
 	Projects          map[string]*ProjectStats
 	HourlyActivity    map[int]*HourlyActivity
@@ -179,4 +173,10 @@ type CostAnalysis struct {
 	ResponseTimes     []time.Duration
 	StartDate         time.Time
 	EndDate           time.Time
+	TotalCost         float64
+	CacheSavings      float64
+	TotalInputTokens  int
+	TotalOutputTokens int
+	TotalCacheRead    int
+	TotalCacheWrite   int
 }

@@ -15,8 +15,8 @@ var (
 
 // ParseError represents an error during file parsing
 type ParseError struct {
-	File string
 	Err  error
+	File string
 }
 
 func (e ParseError) Error() string {

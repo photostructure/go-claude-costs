@@ -43,17 +43,6 @@ func (d *Display) ShowAll() {
 	d.showResponseTimeStats()
 }
 
-// showHeader displays the header with date range
-func (d *Display) showHeader() {
-	fmt.Printf("\n%s Claude Code Usage Analysis %s\n",
-		text.Bold.Sprint("==="),
-		text.Bold.Sprint("==="))
-	fmt.Printf("Period: %s to %s (%d days)\n\n",
-		d.analysis.StartDate.Format("2006-01-02"),
-		d.analysis.EndDate.Format("2006-01-02"),
-		int(d.analysis.EndDate.Sub(d.analysis.StartDate).Hours()/24)+1)
-}
-
 // showCostSummary displays the cost summary
 func (d *Display) showCostSummary() {
 	// Calculate active days
@@ -106,21 +95,6 @@ func (d *Display) showTokenSummary() {
 
 		fmt.Println(t.Render())
 	}
-	fmt.Println()
-}
-
-// showSessionStats displays session statistics
-func (d *Display) showSessionStats() {
-	activeDays := make(map[string]bool)
-	for date, activity := range d.analysis.DailyActivity {
-		if activity.MessageCount > 0 {
-			activeDays[date] = true
-		}
-	}
-
-	fmt.Printf("%s\n", text.Bold.Sprint("📈 Session Statistics"))
-	fmt.Printf("Active Days: %d\n", len(activeDays))
-	fmt.Printf("Sessions per Day: %.1f\n", float64(len(d.analysis.Sessions))/float64(len(activeDays)))
 	fmt.Println()
 }
 

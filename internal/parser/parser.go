@@ -218,26 +218,50 @@ func (p *Parser) processUserEntry(entry *models.Entry, analysis *models.CostAnal
 func (p *Parser) processAssistantEntry(entry *models.Entry, analysis *models.CostAnalysis,
 	projectName, sessionID string, timestamp time.Time, entriesByUUID map[string]*models.Entry) {
 
-	// Calculate response time
-	if entry.ParentUUID != "" {
-		if parentEntry, ok := entriesByUUID[entry.ParentUUID]; ok && parentEntry.Type == "user" {
-			parentTime, err := p.parseTimestamp(parentEntry.Timestamp)
-			if err == nil {
-				responseTime := timestamp.Sub(parentTime)
-				// Sanity check: between 0 and 5 minutes
-				if responseTime > 0 && responseTime < 5*time.Minute {
-					analysis.ResponseTimes = append(analysis.ResponseTimes, responseTime)
+	p.calculateResponseTime(entry, analysis, projectName, timestamp, entriesByUUID)
+	p.updateSessionStats(analysis, sessionID, timestamp)
+	project := p.updateProjectStats(analysis, projectName, sessionID, timestamp)
 
-					// Add to project response times
-					if proj, ok := analysis.Projects[projectName]; ok {
-						proj.ResponseTimes = append(proj.ResponseTimes, responseTime)
-					}
-				}
-			}
-		}
+	cost, model, tokens := p.extractCostAndTokens(entry)
+	if cost == 0 && model == "" {
+		return
 	}
 
-	// Track session and project stats for ALL assistant messages
+	p.updateAnalysisStats(analysis, model, cost, tokens, timestamp)
+	p.updateSessionCosts(analysis, sessionID, cost, tokens)
+	p.updateProjectCosts(project, cost, tokens)
+}
+
+// calculateResponseTime calculates and records response time
+func (p *Parser) calculateResponseTime(entry *models.Entry, analysis *models.CostAnalysis,
+	projectName string, timestamp time.Time, entriesByUUID map[string]*models.Entry) {
+	if entry.ParentUUID == "" {
+		return
+	}
+
+	parentEntry, ok := entriesByUUID[entry.ParentUUID]
+	if !ok || parentEntry.Type != "user" {
+		return
+	}
+
+	parentTime, err := p.parseTimestamp(parentEntry.Timestamp)
+	if err != nil {
+		return
+	}
+
+	responseTime := timestamp.Sub(parentTime)
+	if responseTime <= 0 || responseTime >= 5*time.Minute {
+		return
+	}
+
+	analysis.ResponseTimes = append(analysis.ResponseTimes, responseTime)
+	if proj, ok := analysis.Projects[projectName]; ok {
+		proj.ResponseTimes = append(proj.ResponseTimes, responseTime)
+	}
+}
+
+// updateSessionStats updates session-level statistics
+func (p *Parser) updateSessionStats(analysis *models.CostAnalysis, sessionID string, timestamp time.Time) {
 	session := p.getOrCreateSession(analysis, sessionID)
 	session.MessageCount++
 
@@ -247,90 +271,109 @@ func (p *Parser) processAssistantEntry(entry *models.Entry, analysis *models.Cos
 	if timestamp.After(session.EndTime) {
 		session.EndTime = timestamp
 	}
+}
 
-	// Track project stats
+// updateProjectStats updates project-level statistics
+func (p *Parser) updateProjectStats(analysis *models.CostAnalysis, projectName, sessionID string, timestamp time.Time) *models.ProjectStats {
 	project := p.getOrCreateProject(analysis, projectName)
 
-	// Track sessions per project
 	if project.SessionIDs == nil {
 		project.SessionIDs = make(map[string]bool)
 	}
 	project.SessionIDs[sessionID] = true
 
-	// Track active days
 	dayKey := timestamp.Format("2006-01-02")
 	if project.ActiveDays == nil {
 		project.ActiveDays = make(map[string]bool)
 	}
 	project.ActiveDays[dayKey] = true
 
-	// Calculate cost
-	cost := 0.0
-	model := ""
-	inputTokens := 0
-	outputTokens := 0
-	cacheReadTokens := 0
-	cacheWriteTokens := 0
+	return project
+}
 
-	// Check for old format (costUSD)
+type tokenData struct {
+	inputTokens      int
+	outputTokens     int
+	cacheReadTokens  int
+	cacheWriteTokens int
+}
+
+// extractCostAndTokens extracts cost and token information from entry
+func (p *Parser) extractCostAndTokens(entry *models.Entry) (float64, string, tokenData) {
 	if entry.CostUSD > 0 {
-		cost = entry.CostUSD
-	} else if entry.Message != nil && entry.Message.Usage != nil {
-		// New format with token usage
-		model = entry.Message.Model
-
-		// Skip synthetic messages
-		if model == "<synthetic>" {
-			return
-		}
-
-		usage := entry.Message.Usage
-		inputTokens = usage.InputTokens
-		outputTokens = usage.OutputTokens
-		cacheReadTokens = usage.CacheReadInputTokens
-		cacheWriteTokens = usage.CacheCreationInputTokens
-
-		cost = p.calculateTokenCost(usage, model)
-	} else {
-		// No cost information - but still track session/project
-		return
+		return entry.CostUSD, "", tokenData{}
 	}
 
-	// Update model usage
+	if entry.Message == nil || entry.Message.Usage == nil {
+		return 0, "", tokenData{}
+	}
+
+	model := entry.Message.Model
+	if model == "<synthetic>" {
+		return 0, "", tokenData{}
+	}
+
+	usage := entry.Message.Usage
+	tokens := tokenData{
+		inputTokens:      usage.InputTokens,
+		outputTokens:     usage.OutputTokens,
+		cacheReadTokens:  usage.CacheReadInputTokens,
+		cacheWriteTokens: usage.CacheCreationInputTokens,
+	}
+
+	cost := p.calculateTokenCost(usage, model)
+	return cost, model, tokens
+}
+
+// updateAnalysisStats updates analysis-level statistics
+func (p *Parser) updateAnalysisStats(analysis *models.CostAnalysis, model string, cost float64, tokens tokenData, timestamp time.Time) {
 	if model != "" {
 		analysis.ModelUsage[model]++
 	}
 
-	// Update session stats with cost/token data
-	session.Cost += cost
-	session.InputTokens += inputTokens
-	session.OutputTokens += outputTokens
-	session.CacheReadTokens += cacheReadTokens
-	session.CacheWriteTokens += cacheWriteTokens
-	session.TotalTokens += inputTokens + outputTokens
+	p.updateHourlyActivity(analysis, cost, timestamp)
+	p.updateDailyActivity(analysis, cost, timestamp)
+}
 
-	// Update project stats with cost/token data
-	project.Cost += cost
-	project.InputTokens += inputTokens
-	project.OutputTokens += outputTokens
-	project.CacheReadTokens += cacheReadTokens
-	project.CacheWriteTokens += cacheWriteTokens
-	project.TotalTokens += inputTokens + outputTokens
-
-	// Update hourly activity
+// updateHourlyActivity updates hourly activity statistics
+func (p *Parser) updateHourlyActivity(analysis *models.CostAnalysis, cost float64, timestamp time.Time) {
 	hour := timestamp.Hour()
 	if analysis.HourlyActivity[hour] == nil {
 		analysis.HourlyActivity[hour] = &models.HourlyActivity{}
 	}
 	analysis.HourlyActivity[hour].MessageCount++
 	analysis.HourlyActivity[hour].Cost += cost
+}
 
-	// Update daily activity
+// updateDailyActivity updates daily activity statistics
+func (p *Parser) updateDailyActivity(analysis *models.CostAnalysis, cost float64, timestamp time.Time) {
+	dayKey := timestamp.Format("2006-01-02")
 	if analysis.DailyActivity[dayKey] == nil {
 		analysis.DailyActivity[dayKey] = &models.DailyActivity{}
 	}
 	analysis.DailyActivity[dayKey].MessageCount++
 	analysis.DailyActivity[dayKey].Cost += cost
+}
+
+// updateSessionCosts updates session cost and token statistics
+func (p *Parser) updateSessionCosts(analysis *models.CostAnalysis, sessionID string, cost float64, tokens tokenData) {
+	session := analysis.Sessions[sessionID]
+	session.Cost += cost
+	session.InputTokens += tokens.inputTokens
+	session.OutputTokens += tokens.outputTokens
+	session.CacheReadTokens += tokens.cacheReadTokens
+	session.CacheWriteTokens += tokens.cacheWriteTokens
+	session.TotalTokens += tokens.inputTokens + tokens.outputTokens
+}
+
+// updateProjectCosts updates project cost and token statistics
+func (p *Parser) updateProjectCosts(project *models.ProjectStats, cost float64, tokens tokenData) {
+	project.Cost += cost
+	project.InputTokens += tokens.inputTokens
+	project.OutputTokens += tokens.outputTokens
+	project.CacheReadTokens += tokens.cacheReadTokens
+	project.CacheWriteTokens += tokens.cacheWriteTokens
+	project.TotalTokens += tokens.inputTokens + tokens.outputTokens
 }
 
 // parseTimestamp parses the timestamp string into time.Time

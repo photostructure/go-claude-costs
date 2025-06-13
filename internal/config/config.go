@@ -7,10 +7,10 @@ import (
 
 // Config holds the application configuration
 type Config struct {
+	ClaudeDir string
 	Days      int
 	Verbose   bool
 	ShowCache bool
-	ClaudeDir string
 }
 
 // NewDefault creates a new Config with default values
